@@ -9,21 +9,44 @@
 
 /* string settings */
 #define STRING_NAME String
+#define STRING_FUNC(SUF) String##_##SUF
 #define STRING_ALLOC_SIZE uint32_t
 
 /* status settings */
 #define STATUS_NAME Status
+#define STATUS_FUNC(SUF) Status##_##SUF
 #define STATUS_CODE_SIZE uint8_t
 #define STATUS_ERR_SIZE STATUS_CODE_SIZE
 #define STATUS_FUNCP_SIZE uint16_t
-enum STATUS_STATUS {
-  STATUS_OK,
-  STATUS_ERR,
-};
+enum STATUS_STATUS { STATUS_OK, STATUS_ERR };
 enum STATUS_CODE {
   STATUS_CODE_NONE,
   STATUS_CODE_FAIL_ALLOC,
   STATUS_CODE_FAIL_REALLOC,
+  STATUS_CODE_INVALID_INPUT,
+  STATUS_CODE_INVALID_NULL,
+  STATUS_CODE_BROKEN_STRUCT,
+  STATUS_CODE_FAIL_STRCPY
+};
+const char *err_expl_lookup[] = {"no error",
+                                 "failed to allocate memory",
+                                 "failed to reallocate memory",
+                                 "invalid input given",
+                                 "invalid null pointer given",
+                                 "struct seems to be broken",
+                                 "call to strcpy failed"};
+
+/* function numbers and names */
+const char *func_name_lookup[] = {
+    "NONE",          "String_new()",   "Status_pcheck()",
+    "String_from()", "Status_check()", "String_free()"};
+enum Function_numbers {
+  FUNC_NONE = 0,
+  FUNC_STRING_NEW = 1,
+  FUNC_STATUS_PCHECK,
+  FUNC_STRING_FROM,
+  FUNC_STRING_CHECK,
+  FUNC_STRING_FREE
 };
 
 /* array settings */
@@ -46,7 +69,7 @@ typedef struct STATUS_NAME {
   /* status error or ok */
   STATUS_CODE_SIZE status;
   /* the error code */
-  STATUS_ERR_SIZE err;
+  STATUS_ERR_SIZE code;
   /* number of the error function */
   STATUS_FUNCP_SIZE func;
 } STATUS_NAME;
@@ -60,15 +83,191 @@ typedef struct STRING_NAME {
   char *content;
 } STRING_NAME;
 
+STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE x, STATUS_NAME *status);
+bool STATUS_FUNC(pcheck)(const STATUS_NAME *a, FILE *output);
+STRING_NAME *STRING_FUNC(from)(const char *a, STATUS_NAME *status);
+bool STATUS_FUNC(check)(const STATUS_NAME *a);
+void STRING_FUNC(free)(STRING_NAME *a, STATUS_NAME *status);
+
+/* for debugging */
+#define UTILS_H_IMPLEMENTATION
+
 #ifdef UTILS_H_IMPLEMENTATION
 
-/* function number 1
- * Creates a new string and allocates x bytes for it */
-STRING_NAME *STRING_NAME_new(STRING_ALLOC_SIZE x) {
-  STRING_NAME *s = malloc(sizeof(STRING_NAME));
+/* Function number 1.
+ * Creates a new string and allocates x bytes for it.
+ *
+ * pseudo code (no error checking):
+ * def String_new(int x):
+ *   string s = malloc(sizeof(String))
+ *   s.content = malloc(sizeof(char) * x)
+ *   s.used = 0
+ *   s.content[0] = "\0"
+ *   return s
+ */
+STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE x, STATUS_NAME *status) {
+
+  STRING_NAME *s = NULL;
+  status->func = FUNC_STRING_NEW;
+
+  if (status == NULL) {
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_INVALID_NULL;
+    return NULL;
+  }
+
+  if (x == 0) {
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_INVALID_INPUT;
+    return NULL;
+  }
+
+  s = malloc(sizeof(STRING_NAME));
+  if (s == NULL) {
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_FAIL_ALLOC;
+    return NULL;
+  }
+
   s->content = malloc(sizeof(char) * x);
+  if (s->content == NULL) {
+    free(s);
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_FAIL_ALLOC;
+    return NULL;
+  }
+
+  s->allocated = x;
   s->used = 0;
   s->content[0] = '\0';
+
+  status->status = STATUS_OK;
+  status->code = STATUS_CODE_NONE;
+
+  return s;
+}
+
+/* Function number 2.
+ * Check for an error in status and print it.
+ *
+ * pseudo code:
+ * def Status_pcheck(Status a, file output):
+ *   if (a.status == STATUS_ERR):
+ *     fprintf(output, "%s in function %s\n", status_lookup[a.err],
+ *             func_lookup[a.func])
+ *     return True
+ *   elif (a.status == STATUS_OK):
+ *     return False;
+ *   else:
+ *     fprintf(output, "unknown error code: %i", a.err)
+ *     return True
+ */
+bool STATUS_FUNC(pcheck)(const STATUS_NAME *a, FILE *output) {
+  if (a->status == STATUS_ERR) {
+    fprintf(output, "%s in function %s\n", err_expl_lookup[a->code],
+            func_name_lookup[a->func]);
+    return true;
+  } else if (a->status == STATUS_OK) {
+    return false;
+  } else {
+    fprintf(output, "unknown error code: %i\n", a->code);
+    return true;
+  }
+}
+
+/* Function number 3.
+ * Create a string from c string.
+ *
+ * pseudo code:
+ * def Status_from(char *a):
+ *   STRING_ALLOC_SIZE size = strlen(a) # strlen includes the null terminator
+ *   String s = String_new(size)
+ *   strncpy(s->content, a, size);
+ *   s->used = size - 1;
+ */
+STRING_NAME *STRING_FUNC(from)(const char *a, STATUS_NAME *status) {
+  char *ret = NULL;
+  String *s = NULL;
+  STRING_ALLOC_SIZE size = 0;
+
+  if (a == NULL) {
+    status->func = FUNC_STRING_FROM;
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_INVALID_NULL;
+    return NULL;
+  }
+
+  size = strlen(a) + 1; /* plus one for the null terminator */
+
+  s = STRING_FUNC(new)(size, status);
+  if (STATUS_FUNC(check)(status)) {
+    return NULL;
+  }
+
+  ret = strcpy(s->content, a);
+  if (ret != s->content) {
+    status->func = FUNC_STRING_FROM;
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_FAIL_STRCPY;
+    STRING_FUNC(free)(s, status);
+    return NULL;
+  }
+
+  s->used = size;
+
+  status->func = FUNC_STRING_FROM;
+  status->status = STATUS_OK;
+  status->code = STATUS_CODE_NONE;
+
+  return s;
+}
+
+/* Function number 4.
+ * Check for an error in status *BUT DON'T print it*.
+ *
+ * pseudo code:
+ * def Status_check(Status a):
+ *   if (a.status == STATUS_ERR):
+ *     return True
+ *   elif (a.status == STATUS_OK):
+ *     return False;
+ *   else:
+ *     fprintf(output, "unknown error code: %i", a.err)
+ *     return True
+ */
+bool STATUS_FUNC(check)(const STATUS_NAME *a) {
+  if (a->status == STATUS_ERR) {
+    return true;
+  } else if (a->status == STATUS_OK) {
+    return false;
+  } else {
+    return true;
+  }
+}
+
+/* Function number 5.
+ * Free a string.
+ *
+ * pseudo code:
+ * def Status_check(Status a):
+ *   free(a.content)
+ *   free(a)
+ */
+void STRING_FUNC(free)(STRING_NAME *a, STATUS_NAME *status) {
+  if (a == NULL) {
+    status->func = FUNC_STRING_FREE;
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_INVALID_NULL;
+    return;
+  }
+  if (a->content == NULL) {
+    status->func = FUNC_STRING_FREE;
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_BROKEN_STRUCT;
+    return;
+  }
+  free(a->content);
+  free(a);
 }
 
 #endif /* ifdef UTILS_H_IMPLEMENTATION */
