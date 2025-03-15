@@ -1,6 +1,7 @@
 #ifndef __UTILS_H__
 #define __UTILS_H__
 
+#include <assert.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -26,15 +27,16 @@ enum STATUS_CODE {
   STATUS_CODE_INVALID_INPUT,
   STATUS_CODE_INVALID_NULL,
   STATUS_CODE_BROKEN_STRUCT,
-  STATUS_CODE_FAIL_STRCPY
+  STATUS_CODE_FAIL_STRCPY,
+  STATUS_CODE_MAX
 };
-const char *err_expl_lookup[] = {"no error",
-                                 "failed to allocate memory",
-                                 "failed to reallocate memory",
-                                 "invalid input given",
-                                 "invalid null pointer given",
-                                 "struct seems to be broken",
-                                 "call to strcpy failed"};
+const char *err_expl_lookup[STATUS_CODE_MAX] = {"no error",
+                                                "failed to allocate memory",
+                                                "failed to reallocate memory",
+                                                "invalid input given",
+                                                "invalid null pointer given",
+                                                "struct seems to be broken",
+                                                "call to strcpy failed"};
 
 /* function numbers and names */
 const char *func_name_lookup[] = {
@@ -45,7 +47,7 @@ enum Function_numbers {
   FUNC_STRING_NEW = 1,
   FUNC_STATUS_PCHECK,
   FUNC_STRING_FROM,
-  FUNC_STRING_CHECK,
+  FUNC_STATUS_CHECK,
   FUNC_STRING_FREE
 };
 
@@ -83,14 +85,11 @@ typedef struct STRING_NAME {
   char *content;
 } STRING_NAME;
 
-STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE x, STATUS_NAME *status);
+STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE a, STATUS_NAME *status);
 bool STATUS_FUNC(pcheck)(const STATUS_NAME *a, FILE *output);
 STRING_NAME *STRING_FUNC(from)(const char *a, STATUS_NAME *status);
 bool STATUS_FUNC(check)(const STATUS_NAME *a);
 void STRING_FUNC(free)(STRING_NAME *a, STATUS_NAME *status);
-
-/* for debugging */
-#define UTILS_H_IMPLEMENTATION
 
 #ifdef UTILS_H_IMPLEMENTATION
 
@@ -105,18 +104,17 @@ void STRING_FUNC(free)(STRING_NAME *a, STATUS_NAME *status);
  *   s.content[0] = "\0"
  *   return s
  */
-STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE x, STATUS_NAME *status) {
+STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE a, STATUS_NAME *status) {
 
   STRING_NAME *s = NULL;
-  status->func = FUNC_STRING_NEW;
 
   if (status == NULL) {
-    status->status = STATUS_ERR;
-    status->code = STATUS_CODE_INVALID_NULL;
     return NULL;
   }
 
-  if (x == 0) {
+  status->func = FUNC_STRING_NEW;
+
+  if (a == 0) {
     status->status = STATUS_ERR;
     status->code = STATUS_CODE_INVALID_INPUT;
     return NULL;
@@ -129,7 +127,7 @@ STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE x, STATUS_NAME *status) {
     return NULL;
   }
 
-  s->content = malloc(sizeof(char) * x);
+  s->content = malloc(sizeof(char) * a);
   if (s->content == NULL) {
     free(s);
     status->status = STATUS_ERR;
@@ -137,8 +135,8 @@ STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE x, STATUS_NAME *status) {
     return NULL;
   }
 
-  s->allocated = x;
-  s->used = 0;
+  s->allocated = a;
+  s->used = 1;
   s->content[0] = '\0';
 
   status->status = STATUS_OK;
@@ -149,6 +147,7 @@ STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE x, STATUS_NAME *status) {
 
 /* Function number 2.
  * Check for an error in status and print it.
+ * Returns true if an error is detected otherwise false.
  *
  * pseudo code:
  * def Status_pcheck(Status a, file output):
@@ -163,6 +162,15 @@ STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE x, STATUS_NAME *status) {
  *     return True
  */
 bool STATUS_FUNC(pcheck)(const STATUS_NAME *a, FILE *output) {
+  if (a == NULL) {
+    fprintf(output, "status pointer is null\n");
+    return true;
+  }
+  if (output == NULL) {
+    fprintf(stderr,
+            "Null pointer give as output file. Using stderr as fallback");
+    output = stderr;
+  }
   if (a->status == STATUS_ERR) {
     fprintf(output, "%s in function %s\n", err_expl_lookup[a->code],
             func_name_lookup[a->func]);
@@ -190,6 +198,10 @@ STRING_NAME *STRING_FUNC(from)(const char *a, STATUS_NAME *status) {
   String *s = NULL;
   STRING_ALLOC_SIZE size = 0;
 
+  if (status == NULL) {
+    return NULL;
+  }
+
   if (a == NULL) {
     status->func = FUNC_STRING_FROM;
     status->status = STATUS_ERR;
@@ -201,6 +213,14 @@ STRING_NAME *STRING_FUNC(from)(const char *a, STATUS_NAME *status) {
 
   s = STRING_FUNC(new)(size, status);
   if (STATUS_FUNC(check)(status)) {
+    /* We just return null because the status was already set by the previous
+     * function. */
+    return NULL;
+  }
+  if (s == NULL) {
+    status->status = STATUS_ERR;
+    status->func = FUNC_STRING_FROM;
+    status->code = STATUS_CODE_BROKEN_STRUCT;
     return NULL;
   }
 
@@ -236,6 +256,9 @@ STRING_NAME *STRING_FUNC(from)(const char *a, STATUS_NAME *status) {
  *     return True
  */
 bool STATUS_FUNC(check)(const STATUS_NAME *a) {
+  if (a == NULL) {
+    return true;
+  }
   if (a->status == STATUS_ERR) {
     return true;
   } else if (a->status == STATUS_OK) {
@@ -268,6 +291,9 @@ void STRING_FUNC(free)(STRING_NAME *a, STATUS_NAME *status) {
   }
   free(a->content);
   free(a);
+  status->func = FUNC_STRING_FREE;
+  status->status = STATUS_OK;
+  status->code = STATUS_CODE_NONE;
 }
 
 #endif /* ifdef UTILS_H_IMPLEMENTATION */

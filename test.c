@@ -61,7 +61,7 @@ int main(void) {
   s = STRING_FUNC(new)(10, &status);
   test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
   if (test_status)
-    test_status = test_string(s, 10, 0, NULL);
+    test_status = test_string(s, 10, 1, NULL);
   STRING_FUNC(free)(s, &status);
   s = NULL;
 
@@ -73,14 +73,14 @@ int main(void) {
   s = STRING_FUNC(new)(1, &status);
   test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
   if (test_status)
-    test_status = test_string(s, 1, 0, NULL);
+    test_status = test_string(s, 1, 1, NULL);
   STRING_FUNC(free)(s, &status);
   s = NULL;
 
   s = STRING_FUNC(new)(999999, &status);
   test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
   if (test_status)
-    test_status = test_string(s, 999999, 0, NULL);
+    test_status = test_string(s, 999999, 1, NULL);
   STRING_FUNC(free)(s, &status);
   s = NULL;
 
