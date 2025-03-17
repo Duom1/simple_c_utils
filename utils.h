@@ -40,15 +40,16 @@ const char *err_expl_lookup[STATUS_CODE_MAX] = {"no error",
 
 /* function numbers and names */
 const char *func_name_lookup[] = {
-    "NONE",          "String_new()",   "Status_pcheck()",
-    "String_from()", "Status_check()", "String_free()"};
+    "NONE",           "String_new()",  "Status_pcheck()",   "String_from()",
+    "Status_check()", "String_free()", "String_expand_by()"};
 enum Function_numbers {
   FUNC_NONE = 0,
   FUNC_STRING_NEW = 1,
   FUNC_STATUS_PCHECK,
   FUNC_STRING_FROM,
   FUNC_STATUS_CHECK,
-  FUNC_STRING_FREE
+  FUNC_STRING_FREE,
+  FUNC_STRING_EXPAND_BY
 };
 
 /* array settings */
@@ -295,6 +296,57 @@ void STRING_FUNC(free)(STRING_NAME *a, STATUS_NAME *status) {
   status->status = STATUS_OK;
   status->code = STATUS_CODE_NONE;
 }
+
+/* function number 6
+ * Expands s->allocated by x
+ *
+ * pseudo code(no error cheking):
+ * def String_expand_by(String s, STRING_ALLOC_SIZE x, Status status):
+ *   String st = NULL
+ *   st = realloc(s, (s->allocated + x) * sizeof(char))
+ *   s = st
+ *   return s
+ */
+STRING_NAME *STRING_FUNC(expand_by)(STRING_NAME *s, STRING_ALLOC_SIZE x,
+                                    STATUS_NAME *status) {
+  char *ct = NULL;
+  STRING_ALLOC_SIZE ns = 0;
+  if (status == NULL) {
+    return NULL;
+  }
+  if (s == NULL) {
+    status->func = FUNC_STRING_EXPAND_BY;
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_INVALID_NULL;
+    return s;
+  }
+  ns = (s->allocated + x) * sizeof(char);
+  if (x == 0) {
+    status->func = FUNC_STRING_EXPAND_BY;
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_INVALID_INPUT;
+    return s;
+  }
+  ct = (char *)realloc((STRING_NAME *)s->content, ns);
+  if (ct == NULL) {
+    status->func = FUNC_STRING_EXPAND_BY;
+    status->status = STATUS_ERR;
+    status->code = STATUS_CODE_FAIL_REALLOC;
+    return s;
+  }
+  status->status = STATUS_OK;
+  status->code = STATUS_CODE_NONE;
+  status->func = FUNC_STRING_EXPAND_BY;
+  s->content = ct;
+  s->allocated = ns;
+  return s;
+}
+
+/* Fucntion number 7
+ * Remove x amount of characters from the beginning.
+ *
+ * psudo code(no error checking):
+ */
 
 #endif /* ifdef UTILS_H_IMPLEMENTATION */
 #endif /* ifndef __UTILS_H__ */

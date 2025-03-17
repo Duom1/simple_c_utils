@@ -127,9 +127,61 @@ int main(void) {
   s = NULL;
 
   if (test_status)
-    fprintf(stdout, GRN "%u: Passed String_new() tests\n" CRESET, test);
+    fprintf(stdout, GRN "%u: Passed String_from() tests\n" CRESET, test);
   else
-    fprintf(stdout, "%u: Failed String_new() tests\n", test);
+    fprintf(stdout, "%u: Failed String_from() tests\n", test);
+
+  ++test;
+
+  /* ======================================= */
+  /* ======================================= */
+
+  /* ======================================= */
+  /* = String_expand_by() tests            = */
+  /* ======================================= */
+
+  s = STRING_FUNC(from)("hello world", &status);
+  test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+  if (test_status) {
+    s = STRING_FUNC(expand_by)(s, 10, &status);
+    test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+    if (test_status)
+      test_status = test_string(s, 22, 12, "hello world");
+  }
+  STRING_FUNC(free)(s, &status);
+  s = NULL;
+
+  s = STRING_FUNC(from)("hello world", &status);
+  test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+  if (test_status) {
+    s = STRING_FUNC(expand_by)(s, 0, &status);
+    test_status = STATUS_FUNC(check)(&status); /* this is expected to fail */
+    if (test_status)
+      test_status = test_string(s, 12, 12, "hello world");
+  }
+  STRING_FUNC(free)(s, &status);
+  s = NULL;
+
+  s = STRING_FUNC(from)("hello world", &status);
+  test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+  if (test_status) {
+    s = STRING_FUNC(expand_by)(s, 999999, &status);
+    test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+    if (test_status)
+      test_status = test_string(s, 1000011, 12, "hello world");
+  }
+  STRING_FUNC(free)(s, &status);
+  s = NULL;
+
+  s = NULL;
+  s = STRING_FUNC(expand_by)(s, 999999, &status);
+  test_status = STATUS_FUNC(check)(&status);
+  s = NULL;
+
+  if (test_status)
+    fprintf(stdout, GRN "%u: Passed String_expand_by() tests\n" CRESET, test);
+  else
+    fprintf(stdout, "%u: Failed String_expand_by() tests\n", test);
 
   ++test;
 
