@@ -88,6 +88,7 @@ int main(void) {
     fprintf(stdout, GRN "%u: Passed String_new() tests\n" CRESET, test);
   else
     fprintf(stdout, "%u: Failed String_new() tests\n", test);
+  fflush(stdout);
 
   ++test;
 
@@ -130,6 +131,7 @@ int main(void) {
     fprintf(stdout, GRN "%u: Passed String_from() tests\n" CRESET, test);
   else
     fprintf(stdout, "%u: Failed String_from() tests\n", test);
+  fflush(stdout);
 
   ++test;
 
@@ -182,6 +184,105 @@ int main(void) {
     fprintf(stdout, GRN "%u: Passed String_expand_by() tests\n" CRESET, test);
   else
     fprintf(stdout, "%u: Failed String_expand_by() tests\n", test);
+  fflush(stdout);
+
+  ++test;
+
+  /* ======================================= */
+  /* ======================================= */
+
+  /* ======================================= */
+  /* = String_lead_trunc() tests           = */
+  /* ======================================= */
+
+  s = STRING_FUNC(from)("hello world", &status);
+  test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+  if (test_status) {
+    s = STRING_FUNC(lead_trunc)(s, 6, &status);
+    test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+    if (test_status)
+      test_status = test_string(s, 12, 6, "world");
+  }
+  STRING_FUNC(free)(s, &status);
+  s = NULL;
+
+  s = STRING_FUNC(from)("ab", &status);
+  test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+  if (test_status) {
+    s = STRING_FUNC(lead_trunc)(s, 1, &status);
+    test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+    if (test_status)
+      test_status = test_string(s, 3, 2, "b");
+  }
+  STRING_FUNC(free)(s, &status);
+  s = NULL;
+
+  s = STRING_FUNC(from)("asdcco", &status);
+  test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+  if (test_status) {
+    s = STRING_FUNC(lead_trunc)(s, 0, &status);
+    test_status = STATUS_FUNC(check)(&status);
+  }
+  STRING_FUNC(free)(s, &status);
+  s = NULL;
+
+  s = STRING_FUNC(lead_trunc)(NULL, 0, &status);
+  test_status = STATUS_FUNC(check)(&status);
+
+  s = STRING_FUNC(from)(lorem_ipsum, &status);
+  test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+  if (test_status) {
+    s = STRING_FUNC(lead_trunc)(s, 40, &status);
+    test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+    if (test_status)
+      /* plus one for the null tyerminator */
+      test_status = test_string(s, -1, strlen(lorem_ipsum) + 1 - 40, NULL);
+  }
+  STRING_FUNC(free)(s, &status);
+  s = NULL;
+
+  if (test_status)
+    fprintf(stdout, GRN "%u: Passed String_lead_trunc() tests\n" CRESET, test);
+  else
+    fprintf(stdout, "%u: Failed String_lead_trunc() tests\n", test);
+  fflush(stdout);
+
+  ++test;
+
+  /* ======================================= */
+  /* ======================================= */
+
+  /* ======================================= */
+  /* = String_trunc() tests                = */
+  /* ======================================= */
+
+  s = STRING_FUNC(from)("hello world", &status);
+  test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+  if (test_status) {
+    s = STRING_FUNC(trunc)(s, 6, &status);
+    test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+    if (test_status)
+      test_status = test_string(s, 12, 6, "hello");
+  }
+  STRING_FUNC(free)(s, &status);
+  s = NULL;
+
+  s = STRING_FUNC(from)(lorem_ipsum, &status);
+  test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+  if (test_status) {
+    s = STRING_FUNC(trunc)(s, 55, &status);
+    test_status = !(STATUS_FUNC(pcheck)(&status, stderr));
+    if (test_status)
+      test_status = test_string(s, -1, strlen(lorem_ipsum) + 1 - 55, NULL);
+  }
+  STRING_FUNC(free)(s, &status);
+  s = NULL;
+
+  if (test_status)
+    fprintf(stdout, GRN "%u: Passed String_trunc() tests\n" CRESET, test);
+  else
+    fprintf(stdout, "%u: Failed String_trunc() tests\n", test);
+  fflush(stdout);
 
   ++test;
 

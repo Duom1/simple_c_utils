@@ -39,9 +39,15 @@ const char *err_expl_lookup[STATUS_CODE_MAX] = {"no error",
                                                 "call to strcpy failed"};
 
 /* function numbers and names */
-const char *func_name_lookup[] = {
-    "NONE",           "String_new()",  "Status_pcheck()",   "String_from()",
-    "Status_check()", "String_free()", "String_expand_by()"};
+const char *func_name_lookup[] = {"NONE",
+                                  "String_new()",
+                                  "Status_pcheck()",
+                                  "String_from()",
+                                  "Status_check()",
+                                  "String_free()",
+                                  "String_expand_by()",
+                                  "String_lead_trunc()",
+                                  "String_trunc()"};
 enum Function_numbers {
   FUNC_NONE = 0,
   FUNC_STRING_NEW = 1,
@@ -49,7 +55,9 @@ enum Function_numbers {
   FUNC_STRING_FROM,
   FUNC_STATUS_CHECK,
   FUNC_STRING_FREE,
-  FUNC_STRING_EXPAND_BY
+  FUNC_STRING_EXPAND_BY,
+  FUNC_STRING_LEAD_TRUNC,
+  FUNC_STRING_TRUNC
 };
 
 /* array settings */
@@ -91,6 +99,12 @@ bool STATUS_FUNC(pcheck)(const STATUS_NAME *a, FILE *output);
 STRING_NAME *STRING_FUNC(from)(const char *a, STATUS_NAME *status);
 bool STATUS_FUNC(check)(const STATUS_NAME *a);
 void STRING_FUNC(free)(STRING_NAME *a, STATUS_NAME *status);
+STRING_NAME *STRING_FUNC(expand_by)(STRING_NAME *s, STRING_ALLOC_SIZE x,
+                                    STATUS_NAME *status);
+STRING_NAME *STRING_FUNC(lead_trunc)(STRING_NAME *s, STRING_ALLOC_SIZE n,
+                                     STATUS_NAME *status);
+STRING_NAME *STRING_FUNC(trunc)(STRING_NAME *s, STRING_ALLOC_SIZE n,
+                                STATUS_NAME *status);
 
 #ifdef UTILS_H_IMPLEMENTATION
 
@@ -114,25 +128,23 @@ STRING_NAME *STRING_FUNC(new)(STRING_ALLOC_SIZE a, STATUS_NAME *status) {
   }
 
   status->func = FUNC_STRING_NEW;
+  status->status = STATUS_ERR;
 
   if (a == 0) {
-    status->status = STATUS_ERR;
     status->code = STATUS_CODE_INVALID_INPUT;
     return NULL;
   }
 
+  status->code = STATUS_CODE_FAIL_ALLOC;
+
   s = malloc(sizeof(STRING_NAME));
   if (s == NULL) {
-    status->status = STATUS_ERR;
-    status->code = STATUS_CODE_FAIL_ALLOC;
     return NULL;
   }
 
   s->content = malloc(sizeof(char) * a);
   if (s->content == NULL) {
     free(s);
-    status->status = STATUS_ERR;
-    status->code = STATUS_CODE_FAIL_ALLOC;
     return NULL;
   }
 
@@ -203,9 +215,10 @@ STRING_NAME *STRING_FUNC(from)(const char *a, STATUS_NAME *status) {
     return NULL;
   }
 
+  status->func = FUNC_STRING_FROM;
+  status->status = STATUS_ERR;
+
   if (a == NULL) {
-    status->func = FUNC_STRING_FROM;
-    status->status = STATUS_ERR;
     status->code = STATUS_CODE_INVALID_NULL;
     return NULL;
   }
@@ -219,16 +232,12 @@ STRING_NAME *STRING_FUNC(from)(const char *a, STATUS_NAME *status) {
     return NULL;
   }
   if (s == NULL) {
-    status->status = STATUS_ERR;
-    status->func = FUNC_STRING_FROM;
     status->code = STATUS_CODE_BROKEN_STRUCT;
     return NULL;
   }
 
   ret = strcpy(s->content, a);
   if (ret != s->content) {
-    status->func = FUNC_STRING_FROM;
-    status->status = STATUS_ERR;
     status->code = STATUS_CODE_FAIL_STRCPY;
     STRING_FUNC(free)(s, status);
     return NULL;
@@ -278,23 +287,23 @@ bool STATUS_FUNC(check)(const STATUS_NAME *a) {
  *   free(a)
  */
 void STRING_FUNC(free)(STRING_NAME *a, STATUS_NAME *status) {
-  if (a == NULL) {
+  if (status != NULL) {
     status->func = FUNC_STRING_FREE;
     status->status = STATUS_ERR;
-    status->code = STATUS_CODE_INVALID_NULL;
-    return;
-  }
-  if (a->content == NULL) {
+    if (a == NULL) {
+      status->code = STATUS_CODE_INVALID_NULL;
+      return;
+    }
+    if (a->content == NULL) {
+      status->code = STATUS_CODE_BROKEN_STRUCT;
+      return;
+    }
     status->func = FUNC_STRING_FREE;
-    status->status = STATUS_ERR;
-    status->code = STATUS_CODE_BROKEN_STRUCT;
-    return;
+    status->status = STATUS_OK;
+    status->code = STATUS_CODE_NONE;
   }
   free(a->content);
   free(a);
-  status->func = FUNC_STRING_FREE;
-  status->status = STATUS_OK;
-  status->code = STATUS_CODE_NONE;
 }
 
 /* function number 6
@@ -314,23 +323,19 @@ STRING_NAME *STRING_FUNC(expand_by)(STRING_NAME *s, STRING_ALLOC_SIZE x,
   if (status == NULL) {
     return NULL;
   }
+  status->func = FUNC_STRING_EXPAND_BY;
+  status->status = STATUS_ERR;
   if (s == NULL) {
-    status->func = FUNC_STRING_EXPAND_BY;
-    status->status = STATUS_ERR;
     status->code = STATUS_CODE_INVALID_NULL;
     return s;
   }
   ns = (s->allocated + x) * sizeof(char);
   if (x == 0) {
-    status->func = FUNC_STRING_EXPAND_BY;
-    status->status = STATUS_ERR;
     status->code = STATUS_CODE_INVALID_INPUT;
     return s;
   }
   ct = (char *)realloc((STRING_NAME *)s->content, ns);
   if (ct == NULL) {
-    status->func = FUNC_STRING_EXPAND_BY;
-    status->status = STATUS_ERR;
     status->code = STATUS_CODE_FAIL_REALLOC;
     return s;
   }
@@ -345,8 +350,66 @@ STRING_NAME *STRING_FUNC(expand_by)(STRING_NAME *s, STRING_ALLOC_SIZE x,
 /* Fucntion number 7
  * Remove x amount of characters from the beginning.
  *
- * psudo code(no error checking):
  */
+STRING_NAME *STRING_FUNC(lead_trunc)(STRING_NAME *s, STRING_ALLOC_SIZE n,
+                                     STATUS_NAME *status) {
+  STRING_ALLOC_SIZE i = 0;
+  if (status == NULL) {
+    return NULL;
+  }
+  status->func = FUNC_STRING_LEAD_TRUNC;
+  status->status = STATUS_ERR;
+  if (s == NULL) {
+    status->code = STATUS_CODE_INVALID_NULL;
+    return NULL;
+  }
+  if (s->content == NULL) {
+    status->code = STATUS_CODE_BROKEN_STRUCT;
+    return NULL;
+  }
+  if (n == 0) {
+    status->code = STATUS_CODE_INVALID_INPUT;
+    return NULL;
+  }
+  for (i = 0; i + n < s->used; ++i) {
+    s->content[i] = s->content[i + n];
+  }
+  status->status = STATUS_OK;
+  status->code = STATUS_CODE_NONE;
+  s->used = s->used - n;
+  return s;
+}
+
+/* Fucntion number 7
+ * Remove x amount of characters from the end.
+ *
+ */
+STRING_NAME *STRING_FUNC(trunc)(STRING_NAME *s, STRING_ALLOC_SIZE n,
+                                STATUS_NAME *status) {
+  if (status == NULL) {
+    return NULL;
+  }
+  status->func = FUNC_STRING_TRUNC;
+  status->status = STATUS_ERR;
+  if (s == NULL) {
+    status->code = STATUS_CODE_INVALID_NULL;
+    return NULL;
+  }
+  if (s->content == NULL) {
+    status->code = STATUS_CODE_BROKEN_STRUCT;
+    return NULL;
+  }
+  if (n == 0) {
+    status->code = STATUS_CODE_INVALID_INPUT;
+    return NULL;
+  }
+  status->code = STATUS_CODE_NONE;
+  status->status = STATUS_OK;
+  /* minus one for the null terminator */
+  s->content[s->used - 1 - n] = '\0';
+  s->used = s->used - n;
+  return s;
+}
 
 #endif /* ifdef UTILS_H_IMPLEMENTATION */
 #endif /* ifndef __UTILS_H__ */
