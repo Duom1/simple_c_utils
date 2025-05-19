@@ -2,7 +2,7 @@
 #include <stdio.h>
 
 du_str_res
-du_str_new(u32 size)
+du_str_new(du_u32 size)
 {
   du_str_res a = { 0 };
   du_str* b = NULL;
@@ -36,10 +36,10 @@ du_str_new(u32 size)
   RETURN_OK(a, b);
 }
 
-u32
+du_u32
 du_strlen(char* in)
 {
-  size_t len = 0;
+  du_u32 len = 0;
   while (in[len]) {
     ++len;
   }
@@ -48,9 +48,9 @@ du_strlen(char* in)
 
 
 void
-du_memcpy(char* dest, const char* src, u32 n)
+du_memcpy(char* dest, const char* src, du_u32 n)
 {
-  u32 i = 0;
+  du_u32 i = 0;
   for (; i < n; ++i) {
     dest[i] = src[i];
   }
@@ -62,7 +62,7 @@ du_str_from(char* in)
 {
   du_str_res a = { 0 };
   du_str* b = NULL;
-  u32 len = du_strlen(in);
+  du_u32 len = du_strlen(in);
 
   a = du_str_new(len);
   if (a.stat != DU_OK) {
@@ -90,7 +90,7 @@ du_str_free(du_str* a)
 }
 
 du_str_res
-du_str_ext_to(du_str* str, u32 len)
+du_str_ext_to(du_str* str, du_u32 len)
 {
   du_str_res a = { 0 };
   char* tmp = NULL;
@@ -117,10 +117,10 @@ du_str_ext_to(du_str* str, u32 len)
 }
 
 du_str_res
-du_str_cat(du_str* str, char* t, u32 t_len)
+du_str_cat(du_str* str, char* t, du_u32 t_len)
 {
   du_str_res a = { 0 };
-  u32 c = str->len + t_len;
+  du_u32 c = str->len + t_len;
 
   if (!(str->cap >= c + NULL_TERM_SIZE)) {
     a = du_str_ext_to(str, c);
@@ -138,10 +138,10 @@ du_str_cat(du_str* str, char* t, u32 t_len)
   RETURN_OK(a, str);
 }
 
-u8
-du_str_trim_lead(du_str* s, u32 n)
+du_u8
+du_str_trim_lead(du_str* s, du_u32 n)
 {
-  u32 i = 0;
+  du_u32 i = 0;
   if (n > s->len) {
     return DU_INV_INPUT;
   }
@@ -151,8 +151,8 @@ du_str_trim_lead(du_str* s, u32 n)
   return DU_OK;
 }
 
-u8
-du_str_trim_trail(du_str* s, u32 n)
+du_u8
+du_str_trim_trail(du_str* s, du_u32 n)
 {
   if (n > s->len) {
     return DU_INV_INPUT;
@@ -160,4 +160,46 @@ du_str_trim_trail(du_str* s, u32 n)
   s->cont[s->len - n] = '\0';
   s->len -= n;
   return DU_OK;
+}
+
+/* Compare two piecec of memory. Both variables are expected to be atleast n
+ * bytes long. */
+bool
+du_memcmpb(const char* s1, const char* s2, du_u32 n)
+{
+  du_u32 i = 0;
+  for (; i < n; ++i) {
+    if (s1[i] != s2[i]) {
+      return false;
+    }
+  }
+  return true;
+}
+
+du_u32_opt_res
+du_str_find(du_str* a, du_u32 start, char* f, du_u32 f_len)
+{
+  du_u32_opt_res g = { 0 };
+  du_u32_opt k = { false, 0 };
+  du_u32 i = start;
+
+  if (start >= a->len) {
+    RETURN_ERR(g,
+               DU_INV_INPUT,
+               "start should be less than the string lenght in " __FILE__
+               " line " LINE_STRING);
+  }
+
+  /* i is defined at the beginning of the function */
+  for (; i < a->len - f_len; ++i) {
+    if (a->cont[i] == f[0]) {
+      if (du_memcmpb(a->cont + i, f, f_len)) {
+        k.stat = true;
+        k.val = i;
+        RETURN_OK(g, k);
+      }
+    }
+  }
+
+  RETURN_OK(g, k);
 }

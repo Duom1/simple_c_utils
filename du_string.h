@@ -1,7 +1,8 @@
 #ifndef DU_STRING_H_
 #define DU_STRING_H_
 
-#include "portable_types.h"
+#include "du_portable_types.h"
+#include <stdbool.h>
 #include <stdlib.h>
 
 #define DU_MALLOC malloc
@@ -34,13 +35,13 @@ enum
 typedef struct
 {
   char* cont;
-  u32 len;
-  u32 cap;
+  du_u32 len;
+  du_u32 cap;
 } du_str;
 
 typedef struct
 {
-  u8 stat;
+  du_u8 stat;
   union
   {
     du_str* val;
@@ -48,16 +49,43 @@ typedef struct
   } ret;
 } du_str_res;
 
+typedef struct
+{
+  du_u32* cont;
+  du_u32 len;
+  du_u32 cap;
+} du_u32_list;
 
+typedef struct
+{
+  bool stat;
+  du_u32 val;
+} du_u32_opt;
+
+typedef struct
+{
+  bool stat;
+  du_u32_list val;
+} du_u32_list_opt;
+
+typedef struct
+{
+  du_u8 stat;
+  union
+  {
+    du_u32_opt val;
+    char* err_msg;
+  } ret;
+} du_u32_opt_res;
 
 du_str_res
-du_str_new(u32 size);
+du_str_new(du_u32 size);
 
-u32
+du_u32
 du_strlen(char* in);
 
 void
-du_memcpy(char* dest, const char* src, u32 n);
+du_memcpy(char* dest, const char* src, du_u32 n);
 
 du_str_res
 du_str_from(char* in);
@@ -66,15 +94,21 @@ void
 du_str_free(du_str* a);
 
 du_str_res
-du_str_ext_to(du_str* str, u32 len);
+du_str_ext_to(du_str* str, du_u32 len);
 
 du_str_res
-du_str_cat(du_str* str, char* t, u32 t_len);
+du_str_cat(du_str* str, char* t, du_u32 t_len);
 
-u8
-du_str_trim_trail(du_str* s, u32 n);
+du_u8
+du_str_trim_trail(du_str* s, du_u32 n);
 
-u8
-du_str_trim_lead(du_str* s, u32 n);
+du_u8
+du_str_trim_lead(du_str* s, du_u32 n);
+
+bool
+du_memcmpb(const char* s1, const char* s2, du_u32 n);
+
+du_u32_opt_res
+du_str_find(du_str* a, du_u32 start, char* f, du_u32 f_len);
 
 #endif /* DU_STRING_H_ */
