@@ -1,2 +1,0 @@
-CompileFlags:
-  Add: [-Wall, -Wextra, -pedantic, -std=c89, -DUTILS_H_IMPLEMENTATION]
