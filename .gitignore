@@ -1,3 +1,4 @@
-a.out
-/cache
-*.o
+tmp/
+.cache/
+compile_commands.json
+prog
