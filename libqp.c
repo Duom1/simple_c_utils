@@ -27,12 +27,16 @@ typedef struct qp_str
 qp_uint
 qp_strlen(qp_char* a)
 {
-  qp_uint b = 0;
-  qp_char c = a[b];
-  for (; c != '\0'; ++b) {
-    c = a[b];
+  qp_uint len = 0;
+  qp_char cur = a[len];
+  while (true) {
+    if (cur == '\0') {
+      break;
+    }
+    ++len;
+    cur = a[len];
   }
-  return b;
+  return len;
 }
 
 
@@ -149,10 +153,25 @@ qp_str_del(qp_str_t* a, qp_uint index)
 
 
 qp_str_t*
+qp_str_del_n(qp_str_t* a, qp_uint index, qp_uint n)
+{
+  qp_str_t* tmp;
+  for (; n > 0; --n) {
+    tmp = qp_str_del(a, index);
+    if (tmp == NULL) {
+      return NULL;
+    }
+  }
+  return a;
+}
+
+
+qp_str_t*
 qp_str_ins(qp_str_t* a, qp_uint index, qp_char b)
 {
   qp_str_t* tmp;
   qp_uint i;
+
   if (index > a->used - 1) { /* minus one is used for zero indexing */
     return NULL;
   }
@@ -165,15 +184,49 @@ qp_str_ins(qp_str_t* a, qp_uint index, qp_char b)
     a = tmp;
   }
 
-  for (i = index; i < a->used; ++i) {
-    a->data[i + 1] = a->data[i];
+  for (i = a->used; i > index; --i) {
+    a->data[i] = a->data[i - 1];
   }
 
   a->data[index] = b;
-
-  --a->used;
+  ++a->used;
 
   return a;
+}
+
+
+qp_str_t*
+qp_str_ins_str(qp_str_t* a, qp_uint b, qp_char* c)
+{
+  qp_uint i, c_len = qp_strlen(c), og_used = a->used;
+  qp_str_t* tmp;
+  qp_char d;
+
+  if (b + 1 > og_used) {
+    return NULL;
+  }
+
+  for (i = c_len; i > 0; --i) {
+    /* FIX: the side effect of adding characters even when insertion fails */
+    d = c[i - 1];
+    tmp = qp_str_ins(a, b, d);
+    if (tmp == NULL) {
+      return NULL;
+    }
+  }
+
+  if (b + 1 == og_used) {                /* plus one for null terminator */
+    a->data[og_used + c_len - 1] = '\0'; /* minus one for zero indexing */
+  }
+
+  return a;
+}
+
+
+qp_str_t*
+qp_str_cat(qp_str_t* a, qp_char* b)
+{
+  return qp_str_ins_str(a, a->used - 1, b); /* minus one for zero indexing*/
 }
 
 
@@ -186,7 +239,8 @@ qp_str_from(qp_char* a)
     return NULL;
   }
   qp_strcpy(str->data, a);
-  str->data[len - 1] = '\0'; /* minus one for the null terminator */
+  str->data[len - 1] = '\0'; /* minus one for the zero indexing */
+  str->used = len;
   return str;
 }
 
@@ -203,6 +257,12 @@ qp_str_free(qp_str_t* a)
 }
 
 
+void
+qp_str_free_generic(void* a)
+{
+  qp_str_free(a);
+}
+
 
 int
 main(void)
@@ -214,6 +274,10 @@ main(void)
   assert(str->used == 1);
   assert(str->data[0] == '\0');
   qp_str_free(str);
+
+  assert(qp_strlen("jarkko") == 6);
+  assert(qp_strlen("") == 0);
+  assert(qp_strlen("a") == 1);
 
   str = qp_str_new(2);
   assert(str != NULL);
@@ -280,7 +344,7 @@ main(void)
   str = str2;
   str2 = NULL;
   assert(str->allocated == 3);
-  assert(str->used == 1);
+  assert(str->used == 3);
   assert(str->data[0] == 'a');
   assert(str->data[1] == 'b');
   assert(str->data[2] == '\0');
@@ -290,6 +354,36 @@ main(void)
   assert(str->data[4] == 'o');
   assert(str->data[12] == '\n');
   assert(str->data[13] == '\0');
+  qp_str_free(str);
+
+  str = qp_str_from("hello ");
+  str2 = qp_str_ins_str(str, 6, "world!\n");
+  assert(str2 != NULL);
+  str = str2;
+  str2 = NULL;
+  assert(str->data[4] == 'o');
+  assert(str->data[12] == '\n');
+  assert(str->data[13] == '\0');
+  qp_str_free(str);
+
+  str = qp_str_from("hello ");
+  str2 = qp_str_cat(str, "world!\n");
+  assert(str2 != NULL);
+  str = str2;
+  str2 = NULL;
+  assert(str->data[4] == 'o');
+  assert(str->data[12] == '\n');
+  assert(str->data[13] == '\0');
+  qp_str_free(str);
+
+  str = qp_str_from("hello world!\n");
+  str2 = qp_str_del_n(str, 6, 7);
+  assert(str2 != NULL);
+  str = str2;
+  str2 = NULL;
+  assert(str->data[0] == 'h');
+  assert(str->data[4] == 'o');
+  assert(str->data[6] == '\0');
   qp_str_free(str);
 
   return 0;
